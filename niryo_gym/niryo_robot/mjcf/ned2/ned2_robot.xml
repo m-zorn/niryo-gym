@@ -1,10 +1,5 @@
 <mujoco>
-    <body mocap="true" name="robot0:mocap" pos="0 0 0">
-      <!-- <geom conaffinity="0" contype="0" pos="0 0 0" rgba="0.5 0 0 0.15" size="1 0.005 0.005" type="box"></geom>
-      <geom conaffinity="0" contype="0" pos="0 0 0" rgba="0 0 0.5 0.15" size="0.005 1 0.001" type="box"></geom>
-      <geom conaffinity="0" contype="0" pos="0 0 0" rgba="0 0.5 0 0.15" size="0.005 0.005 1" type="box"></geom> -->
-    </body>
-    <body childclass="ned2:robot" name="robot0:base_link" pos="0 0 0">
+    <body childclass="ned2:robot" name="robot0:base_link" pos="-0.3 0.0 -0.25">
       <site name="robot0:base_center" size="0.01" pos="0 0 0" rgba="1 0 0 1" type="sphere"/>
       <geom pos="0 0 0" quat="0.707107 -0.707107 0 0" type="mesh" mesh="robot0:base_link" name="robot0:base_link" contype="1" conaffinity="0" mass="0.71142" group="1" class="ned2:grey"/>
       
@@ -49,7 +44,7 @@
                  
                   <!-- The gripper base (this part + gripper teeth are swappable irl) -->
                   <body name="robot0:base_gripper" pos="-0.007 0 0.0315" quat="0.707107 -0.707107 0 0">
-                      <geom  type="mesh" mesh="robot0:base_gripper" name="robot0:base_gripper" contype="1" conaffinity="0"  group="1" class="ned2:dark"/>
+                      <geom  type="mesh" mesh="robot0:base_gripper" name="robot0:base_gripper" contype="1" conaffinity="0"  group="1" class="ned2:blue"/>
                   </body>
 
                     <!-- Camera Gizmo (where camera records virtually, no mesh/mass) -->
