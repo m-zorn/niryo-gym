@@ -41,8 +41,15 @@ You can change these setting in the `gym.make` call, e.g.;
     )
 ```
 
+### Reward
+
+By default, the agent receives a sparse reward signal (`reward_type='sparse'`), i.e., $1$ if the Euclidean distance between the achieved goal position and the desired goal (depending on the Task) is below the `distance_threshold=0.05` and $0$ otherwise.
+
+Use `reward_type='dense'` to receive a dense reward signal calculated according to the distance to the target, i.e., the returned reward is the negative Euclidean distance between the achieved goal position and the desired goal.
+
+
 ### Action and Observation Spaces
-Depending on the `control_type`(wip) and `observation_type` the environments changes respectively to:
+Depending on the `control_type` and `observation_type` the environments changes respectively to:
 
 | `control_type` | `observation_type` | observation | action |
 |:--------------:|--------------------|-------------|-------|
