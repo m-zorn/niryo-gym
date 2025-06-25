@@ -5,7 +5,12 @@ import niryo_gym
 if __name__=="__main__":
     # Initialize env and model
     env_name = "NiryoReach-v1"
-    env = gym.make(env_name, render_mode="human", observation_type="camera")
+    env = gym.make(
+        env_name, 
+        render_mode="human", 
+        observation_type="camera", 
+        control_type="free"
+    )
     model = PPO(
         "MultiInputPolicy",
         env,

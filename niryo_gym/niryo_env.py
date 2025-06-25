@@ -4,7 +4,6 @@ from gymnasium.utils.ezpickle import EzPickle
 from niryo_gym.farama_robotics.robot_env import MujocoRobotEnv
 from niryo_gym.farama_robotics import rotations
 
-MODEL_XML_PATH = os.path.join(os.path.dirname(__file__), "niryo_robot/mjcf/ned2/ned2.xml")
 
 DEFAULT_CAMERA_CONFIG = {
     # "distance": 1.5,
@@ -54,6 +53,7 @@ class BaseNiryoEnv(MujocoRobotEnv):
         target_range,
         distance_threshold,
         reward_type,
+        control_type,
         **kwargs,
     ):
         """Initializes a new Niryo environment.
@@ -71,8 +71,10 @@ class BaseNiryoEnv(MujocoRobotEnv):
             distance_threshold (float): the threshold after which a goal is considered achieved
             initial_qpos (dict): a dictionary of joint names and values that define the initial configuration
             reward_type ('sparse' or 'dense'): the reward type, i.e. sparse or dense
+            control_type ('mocap' or 'free'): the control type, i.e. mocap or free
         """
-
+        assert control_type in ["mocap", "free"], "Invalid control_type"
+        self.control_type = control_type
         self.gripper_extra_height = gripper_extra_height
         self.block_gripper = block_gripper
         self.has_object = has_object
@@ -83,10 +85,9 @@ class BaseNiryoEnv(MujocoRobotEnv):
         self.distance_threshold = distance_threshold
         self.reward_type = reward_type
 
-        super().__init__(**kwargs) #n_actions=4
-
-    # GoalEnv methods
-    # ----------------------------
+        model_path = os.path.join(os.path.dirname(__file__), f"niryo_robot/mjcf/ned2/ned2{control_type}.xml")
+        n_actions = (3 + (not block_gripper)) if control_type == "mocap" else 8
+        super().__init__(n_actions=n_actions, model_path=model_path, **kwargs)
 
     def compute_reward(self, achieved_goal, goal, info):
         # Compute distance between goal and the achieved goal.
@@ -99,27 +100,29 @@ class BaseNiryoEnv(MujocoRobotEnv):
     # RobotEnv methods
     # ----------------------------
 
-    def _set_action(self, action):
-        assert action.shape == (4,)
-        action = (
-            action.copy()
-        )  # ensure that we don't change the action outside of this scope
-        pos_ctrl, gripper_ctrl = action[:3], action[3]
-
-        pos_ctrl *= 0.05  # limit maximum change in position
-        rot_ctrl = [
-            1.0,
-            0.0,
-            1.0,
-            0.0,
-        ]  # fixed rotation of the end effector, expressed as a quaternion
-        gripper_ctrl = np.array([gripper_ctrl, gripper_ctrl])
-        assert gripper_ctrl.shape == (2,)
-        if self.block_gripper:
-            gripper_ctrl = np.zeros_like(gripper_ctrl)
-        action = np.concatenate([pos_ctrl, rot_ctrl, gripper_ctrl])
-
+    def _set_mocap(self, action):
+        action = ( action.copy() )  # ensure that we don't change the action outside of this scope
+        pos_ctrl = action[:3] * 0.05  # limit maximum change in position
+        action = np.concatenate([pos_ctrl, np.zeros((4,))])  # zeros for automatic rotation
+        if not self.block_gripper: 
+            gripper_ctrl = np.array([action[3], action[3]])
+            action = np.concatenate([action, gripper_ctrl])
         return action
+    
+    def _set_free(self, action):
+        ctrlrange = self.model.actuator_ctrlrange
+        actuation_range = (ctrlrange[:, 1] - ctrlrange[:, 0]) / 2.0
+        actuation_center = (ctrlrange[:, 1] + ctrlrange[:, 0]) / 2.0
+        return np.clip(
+            actuation_center + action * actuation_range, 
+            ctrlrange[:, 0], ctrlrange[:, 1]
+        )
+
+    def _set_action(self, action):
+        assert action.shape == (self.n_actions,)
+        if self.control_type == "mocap": return self._set_mocap(action)
+        if self.control_type == "free": return self._set_free(action)
+        raise ValueError(f"Invalid control_type {self.control_type}!")
 
     def _get_obs(self):
         (
@@ -180,17 +183,13 @@ class BaseNiryoEnv(MujocoRobotEnv):
 
     def _sample_goal(self):
         if self.has_object:
-            goal = self.initial_gripper_xpos[:3] + self.np_random.uniform(
-                -self.target_range, self.target_range, size=3
-            )
-            goal += self.target_offset
+            goal = self.target_offset + self.np_random.uniform( -self.target_range, self.target_range, size=3 )
             goal[2] = self.height_offset
             if self.target_in_the_air and self.np_random.uniform() < 0.5:
                 goal[2] += self.np_random.uniform(0, 0.45)
         else:
-            goal = self.initial_gripper_xpos[:3] + self.np_random.uniform(
-                -self.target_range, self.target_range, size=3
-            )
+            goal = self.np_random.uniform( -self.target_range, self.target_range, size=3 )
+        
         return goal.copy()
 
     def _is_success(self, achieved_goal, desired_goal):
@@ -309,20 +308,9 @@ class MujocoNiryoEnv(BaseNiryoEnv):
     def _env_setup(self, initial_qpos):
         for name, value in initial_qpos.items():
             self._utils.set_joint_qpos(self.model, self.data, name, value)
-        self._utils.reset_mocap_welds(self.model, self.data)
-        self._mujoco.mj_forward(self.model, self.data)
+        self._utils.reset_mocap2body_xpos(self.model, self.data)
+        self._mujoco.mj_forward(self.model, self.data)        
 
-        # Move end effector into position.
-        gripper_target = np.array(
-            [-0.498, 0.005, -0.431 + self.gripper_extra_height]
-        ) + self._utils.get_site_xpos(self.model, self.data, "robot0:grip")
-        gripper_rotation = np.array([1.0, 0.0, 1.0, 0.0])
-        self._utils.set_mocap_pos(self.model, self.data, "robot0:mocap", gripper_target)
-        self._utils.set_mocap_quat(
-            self.model, self.data, "robot0:mocap", gripper_rotation
-        )
-        for _ in range(10):
-            self._mujoco.mj_step(self.model, self.data, nstep=self.n_substeps)
         # Extract information for sampling goals.
         self.initial_gripper_xpos = self._utils.get_site_xpos(
             self.model, self.data, "robot0:grip"
@@ -335,17 +323,12 @@ class MujocoNiryoEnv(BaseNiryoEnv):
 
 class MujocoNiryoReachEnv(MujocoNiryoEnv, EzPickle):
 
-    def __init__(self, reward_type="sparse", observation_type="goal", **kwargs):
+    def __init__(self, reward_type="sparse", observation_type="goal", control_type='mocap', **kwargs):
         # position data is 7 numbers (3D position followed by unit quaternion),
         # velocity data is 6 numbers (3D linear velocity followed by 3D angular velocity)
         self.observation_type = observation_type
-        initial_qpos = {
-            # "robot0:base_link": [0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0],
-            "object0:joint": [0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0],
-        }
         MujocoNiryoEnv.__init__(
             self,
-            model_path=MODEL_XML_PATH,
             has_object=False,
             block_gripper=True,
             n_substeps=20,
@@ -355,16 +338,16 @@ class MujocoNiryoReachEnv(MujocoNiryoEnv, EzPickle):
             obj_range=0.15,
             target_range=0.15,
             distance_threshold=0.05,
-            initial_qpos=initial_qpos,
+            initial_qpos={},
             reward_type=reward_type,
-            n_actions=4,
+            control_type=control_type,
             **kwargs,
         )
         EzPickle.__init__(self, reward_type=reward_type, observation_type=observation_type, **kwargs)
 
 class MujocoNiryoPickAndPlaceEnv(MujocoNiryoEnv, EzPickle):
 
-    def __init__(self, reward_type="sparse", observation_type="goal", **kwargs):
+    def __init__(self, reward_type="sparse", observation_type="goal", control_type='mocap', **kwargs):
         # position data is 7 numbers (3D position followed by unit quaternion),
         # velocity data is 6 numbers (3D linear velocity followed by 3D angular velocity)
         self.observation_type = observation_type
@@ -374,7 +357,6 @@ class MujocoNiryoPickAndPlaceEnv(MujocoNiryoEnv, EzPickle):
         }
         MujocoNiryoEnv.__init__(
             self,
-            model_path=MODEL_XML_PATH,
             has_object=True,
             block_gripper=False,
             n_substeps=20,
@@ -386,14 +368,14 @@ class MujocoNiryoPickAndPlaceEnv(MujocoNiryoEnv, EzPickle):
             distance_threshold=0.05,
             initial_qpos=initial_qpos,
             reward_type=reward_type,
-            n_actions=4,
+            control_type=control_type,
             **kwargs,
         )
         EzPickle.__init__(self, reward_type=reward_type, **kwargs)
 
 class MujocoNiryoLiftEnv(MujocoNiryoEnv, EzPickle):
 
-    def __init__(self, reward_type="sparse", observation_type="goal", **kwargs):
+    def __init__(self, reward_type="sparse", observation_type="goal", control_type='mocap', **kwargs):
         # position data is 7 numbers (3D position followed by unit quaternion),
         # velocity data is 6 numbers (3D linear velocity followed by 3D angular velocity)
         self.observation_type = observation_type
@@ -403,7 +385,6 @@ class MujocoNiryoLiftEnv(MujocoNiryoEnv, EzPickle):
         }
         MujocoNiryoEnv.__init__(
             self,
-            model_path=MODEL_XML_PATH,
             has_object=True,
             block_gripper=False,
             n_substeps=20,
@@ -415,7 +396,7 @@ class MujocoNiryoLiftEnv(MujocoNiryoEnv, EzPickle):
             distance_threshold=0.05,
             initial_qpos=initial_qpos,
             reward_type=reward_type,
-            n_actions=4,
+            control_type=control_type,
             **kwargs,
         )
         EzPickle.__init__(self, reward_type=reward_type, **kwargs)

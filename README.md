@@ -22,7 +22,8 @@ All base-environments are registered with the following default parameters:
 ```python
         default_kwargs = {
             "reward_type":"sparse",    # one of ['sparse', 'dense']
-            "observation_type":"goal"  # one of ['goal', 'camera']
+            "observation_type":"goal", # one of ['goal', 'camera']
+            "control_type": "mocap",   # one of ['mocap', 'free']
             "width":512, "height":512  # rendering resolution (px)
         }
         max_episode_length = 50
@@ -35,19 +36,27 @@ You can change these setting in the `gym.make` call, e.g.;
         max_episode_steps=100, 
         reward_type="dense", 
         observation_type="camera",
+        control_type="free",
         width=128, height=128
     )
 ```
 
+### Reward
+
+By default, the agent receives a sparse reward signal (`reward_type='sparse'`), i.e., $1$ if the Euclidean distance between the achieved goal position and the desired goal (depending on the Task) is below the `distance_threshold=0.05` and $0$ otherwise.
+
+Use `reward_type='dense'` to receive a dense reward signal calculated according to the distance to the target, i.e., the returned reward is the negative Euclidean distance between the achieved goal position and the desired goal.
+
+
 ### Action and Observation Spaces
-Depending on the `control_type`(wip) and `observation_type` the environments changes respectively to:
+Depending on the `control_type` and `observation_type` the environments changes respectively to:
 
 | `control_type` | `observation_type` | observation | action |
 |:--------------:|--------------------|-------------|-------|
-|  `mocap`       | `goal` | `dict(`<br>`desired_goal=Box(3,),`<br>`achieved_goal=Box(3,),`<br>`observation=Box(10,)`<br>`)`| `Box(-1.0, 1.0, (4,))`|
+|  `mocap`       | `goal`   | `dict(`<br>`desired_goal=Box(3,),`<br>`achieved_goal=Box(3,),`<br>`observation=Box(10,)`<br>`)`| `Box(-1.0, 1.0, (4,))`|
 |  `mocap`       | `camera` | `dict(`<br>`camera_pov=Box(width,height,3),`<br>`camera_front=Box(width,height,3),`<br>`observation=Box(10,)`<br>`)`| `Box(-1.0, 1.0, (4,))`|
-|  `free` (wip)      | `goal` | `dict(`<br>`desired_goal=Box(3,),`<br>`achieved_goal=Box(3,),`<br>`observation=Box(10,)`<br>`)`| `Box(-1.0, 1.0, (7,))`|
-|  `free` (wip)      | `camera` | `dict(`<br>`camera_pov=Box(width,height,3),`<br>`camera_front=Box(width,height,3),`<br>`observation=Box(10,)`<br>`)`| `Box(-1.0, 1.0, (7,))`|
+|  `free`        | `goal`   | `dict(`<br>`desired_goal=Box(3,),`<br>`achieved_goal=Box(3,),`<br>`observation=Box(10,)`<br>`)`| `Box(-1.0, 1.0, (7,))`|
+|  `free`        | `camera` | `dict(`<br>`camera_pov=Box(width,height,3),`<br>`camera_front=Box(width,height,3),`<br>`observation=Box(10,)`<br>`)`| `Box(-1.0, 1.0, (7,))`|
 
 where 
 - `observation_type='goal'` is the goal-aware farama-robotics fetch robot dict-observation space (e.g. for Hindsight Experience Replay),
