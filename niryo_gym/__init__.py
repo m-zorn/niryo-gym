@@ -11,8 +11,9 @@ def register_robotics_envs():
     """Register all environment ID's to Gymnasium."""
 
     default_kwargs = {
-        "reward_type": "sparse",    # one of ['sparse', 'dense']
-        "observation_type": "goal"  # one of ['goal', 'camera']
+        "reward_type": "sparse",     # one of ['sparse', 'dense']
+        "observation_type": "goal",  # one of ['goal', 'camera']
+        "control_type": "mocap"      # one of ['mocap', 'free']
     }
 
     register(

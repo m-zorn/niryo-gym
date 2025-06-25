@@ -1,5 +1,6 @@
 import gymnasium as gym
 from stable_baselines3 import HerReplayBuffer, DDPG
+import niryo_gym
 
 if __name__=="__main__":
     # Initialize env and model
