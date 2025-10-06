@@ -58,9 +58,9 @@
     <body mocap="true" name="robot0:mocap" pos="0 0 0" ></body>
 		<include file="ned2_robot.xml"></include>
 
-		<body name="object0" pos="0.35 0.0 -0.25">
+		<body name="object0" pos="0.35 0.00 -0.25">
 			<joint name="object0:joint" type="free" damping="0.1"></joint>
-			<geom size="0.015 0.015 0.015" type="box" condim="3" name="object0" material="block_mat" mass="0.005" />
+			<geom size="0.01 0.01 0.01" type="box" condim="3" name="object0" material="block_mat" mass="0.003" />
 			<site name="object0" pos="0 0 0" size="0.01 0.01 0.01" rgba="1 0 0 1" type="sphere"></site>
 		</body>
 
@@ -68,7 +68,7 @@
 	</worldbody>
 
   <actuator>
-    <motor name="r_gripper"    joint="robot0:r_gripper_finger_joint" ctrllimited="true" ctrlrange="-1 1" user="1" gear="100"/>
-    <motor name="l_gripper"     joint="robot0:l_gripper_finger_joint" ctrllimited="true" ctrlrange="-1 1" user="1" gear="100"/>
+    <motor name="r_gripper"    joint="robot0:r_gripper_finger_joint" ctrllimited="true" ctrlrange="-1 1" user="1" gear="500"/>
+    <motor name="l_gripper"     joint="robot0:l_gripper_finger_joint" ctrllimited="true" ctrlrange="-1 1" user="1" gear="500"/>
   </actuator>
 </mujoco>
